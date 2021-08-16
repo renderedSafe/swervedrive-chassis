@@ -2,6 +2,7 @@
 #include "Servo.h"
 #include <Adafruit_PWMServoDriver.h>
 #include "SwerveDrive.h"
+#include "SerialTransfer.h"
 
 //these are pin numbers on the mega
 const int SERVO_FL_PIN = 44;
@@ -31,9 +32,16 @@ SwerveDrive swerve_drive = SwerveDrive(servo_fl,servo_fr,servo_bl, servo_br,
                                          DcMotor(MOTOR_BL_FWD_PIN, MOTOR_BL_BKWD_PIN, pwm_controller, FORWARD),
                                          DcMotor(MOTOR_BR_FWD_PIN, MOTOR_BR_BKWD_PIN, pwm_controller, FORWARD));
 
-
 //for drive power watchdog timer
 long lastDriveCommandMillis = 0;
+bool all_stop = true;
+
+SerialTransfer myTransfer;
+struct __attribute__((__packed__)) STATE_COMMAND_STRUCT 
+{
+  float turn_angle;
+  float drive_power;
+} struct_state_command;
 
 void setup() 
 {
@@ -49,41 +57,23 @@ void setup()
   pwm_controller.setPWMFreq(1500);  
   //delay accounts for I2C write
   delay(10);
-  Serial.begin(9600);
+  Serial.begin(115200);
+  myTransfer.begin(Serial);
 }
 
 void loop() 
 {
-  
-      lastDriveCommandMillis = millis();
-      break;
-
-      case DRIVE_BKWD:
-      all_stop = false;
-      commandedSpeed = copysign(commandedSpeed, -1);  //we're going backwards, change commandedSpeed to reflect 
-      lastDriveCommandMillis = millis();
-      break;
-
-      case POWER_FLAG:
-      int rawPower = 0;
-      int mappedPower = 0;
-      rawPower = Serial.parseInt();
-      mappedPower = map(rawPower, 0, 255, 0, 1000);
-      commandedSpeed = (double)mappedPower / 1000.0;
-      break;
-    }  //end switch
-
-    if (Serial.available() > 0)
-    {
-       Serial.flush();  //we need to get the freshest serial data so we don't build up old commands
-    }
-  }  //end if serial available
-
-
+  if (myTransfer.available())
+  {
+    myTransfer.rxObj(struct_state_command);
+    lastDriveCommandMillis = millis();
+    all_stop = false;
+  }
+      
   //sets active drive power from flag. checks watchdog timer. 
   if (!all_stop && (millis() - lastDriveCommandMillis) < 220)
   {
-    swerve_drive.setDrivePower(commandedSpeed);
+    swerve_drive.setDrivePower(struct_state_command.drive_power);
   }
   else  //ALL STOP!!
   {
@@ -92,7 +82,7 @@ void loop()
   }
 
   //swerve_drive.translationTurn(commandedTurnAngle);
-  swerve_drive.headingTurn(commandedTurnAngle);
+  swerve_drive.headingTurn(struct_state_command.turn_angle);
 
 
 }
