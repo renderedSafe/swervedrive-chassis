@@ -18,7 +18,14 @@ const int MOTOR_BL_FWD_PIN = 5;
 const int MOTOR_BL_BKWD_PIN = 4;
 const int MOTOR_BR_FWD_PIN = 7;
 const int MOTOR_BR_BKWD_PIN = 6;
-//Servo Objects
+//Encoder pin numbers
+const int ENCODER_BL_1 = 2;
+const int ENCODER_BL_2 = 3;
+
+//Odometer object standing in for testing.
+Odometer bl_odometer = Odometer(ENCODER_BL_1, ENCODER_BL_2, 100);
+
+//Servo Objects to pass to swervedrive
 Servo servo_br;
 Servo servo_bl;
 Servo servo_fl;
@@ -58,11 +65,13 @@ void setup()
   //delay accounts for I2C write
   delay(10);
   Serial.begin(115200);
+  Serial3.begin(9600);
   myTransfer.begin(Serial);
 }
 
 void loop() 
 {
+  bl_odometer.update();  //recalculate speed of this odometer
   if (myTransfer.available())
   {
     myTransfer.rxObj(struct_state_command);
@@ -84,6 +93,10 @@ void loop()
   //swerve_drive.translationTurn(commandedTurnAngle);
   swerve_drive.headingTurn(struct_state_command.turn_angle);
 
-
+  //Serial3.print("Odo pos:");
+  //Serial3.println(bl_odometer.encoder.read());
+  Serial3.print("Odo speed: ");
+  Serial3.println(bl_odometer.last_speed);
+  
 }
 
